@@ -78,3 +78,40 @@ esp_err_t fpc1020_get_hwid(uint16_t *hwid)
 
     return ret;
 }
+
+esp_err_t fpc1020_read_interrupt(fpc1020_interrupt_t *interrupt, uint8_t clear)
+{
+    spi_transaction_t t = {
+        .cmd = clear ? 0x1C : 0x18,
+        .length = 8,
+        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+
+    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(LOG_TAG, "Failed to retrieve interrupt status: %d", ret);
+        return ret;
+    }
+
+    interrupt->command_done = (t.rx_data[0] & (1 << 7)) != 0;
+    interrupt->image_available = (t.rx_data[0] & (1 << 5)) != 0;
+    interrupt->error = (t.rx_data[0] & (1 << 2)) != 0;
+    interrupt->finger_down = (t.rx_data[0] & (1 << 0)) != 0;
+
+    return ret;
+}
+
+esp_err_t fpc1020_finger_present_query()
+{
+    spi_transaction_t t = {
+        .cmd = 0x20};
+
+    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(LOG_TAG, "Failed to query finger present: %d", ret);
+        return ret;
+    }
+
+    return ESP_OK;
+}
