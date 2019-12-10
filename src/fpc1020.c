@@ -29,10 +29,11 @@ esp_err_t fpc1020_init()
         .max_transfer_sz = 192 * 192};
 
     spi_device_interface_config_t devcfg = {
-        .clock_speed_hz = 10 * 1000 * 1000,
+        .command_bits = 8,
+        .clock_speed_hz = SPI_MASTER_FREQ_8M,
         .mode = 0,                  //SPI mode 0
         .spics_io_num = PIN_NUM_CS, //CS pin
-        .queue_size = 7,            //We want to be able to queue 7 transactions at a time
+        .queue_size = 1,            //We want to be able to queue 7 transactions at a time
         // .pre_cb = lcd_spi_pre_transfer_callback, //Specify pre-transfer callback to handle D/C line
     };
 
@@ -56,14 +57,13 @@ esp_err_t fpc1020_init()
 
 esp_err_t fpc1020_get_hwid(uint16_t *hwid)
 {
-    static uint8_t cmd[2] = {0xFC, 0x00};
+    uint8_t rx_buffer[2] = {0, 0};
 
-    spi_transaction_t t;
-    memset(&t, 0, sizeof(t));
-    t.length = 8 * 3;
-    t.tx_buffer = cmd;
-    t.flags = SPI_TRANS_USE_RXDATA;
-    t.user = (void *)0;
+    spi_transaction_t t = {
+        .cmd = 0xFC,
+        .length = 8 * 2,
+        .flags = SPI_TRANS_USE_TXDATA,
+        .rx_buffer = rx_buffer};
 
     esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
     if (ret != ESP_OK)
@@ -72,7 +72,9 @@ esp_err_t fpc1020_get_hwid(uint16_t *hwid)
         return ret;
     }
 
-    *hwid = *(uint16_t *)t.rx_data;
+    ESP_LOGI(LOG_TAG, "Received %d bits of data", t.rxlength);
+
+    *hwid = rx_buffer[0] << 8 | rx_buffer[1];
 
     return ret;
 }
