@@ -1,2 +1,2 @@
-# fpc1020-esp
+# FPC1020 Fingerprint Scanner ESP IDF
 
