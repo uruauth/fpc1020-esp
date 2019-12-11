@@ -57,13 +57,10 @@ esp_err_t fpc1020_init()
 
 esp_err_t fpc1020_get_hwid(uint16_t *hwid)
 {
-    uint8_t rx_buffer[2] = {0, 0};
-
     spi_transaction_t t = {
         .cmd = 0xFC,
         .length = 8 * 2,
-        .flags = SPI_TRANS_USE_TXDATA,
-        .rx_buffer = rx_buffer};
+        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
 
     esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
     if (ret != ESP_OK)
@@ -72,9 +69,7 @@ esp_err_t fpc1020_get_hwid(uint16_t *hwid)
         return ret;
     }
 
-    ESP_LOGI(LOG_TAG, "Received %d bits of data", t.rxlength);
-
-    *hwid = rx_buffer[0] << 8 | rx_buffer[1];
+    *hwid = t.rx_data[0] << 8 | t.rx_data[1];
 
     return ret;
 }
@@ -92,6 +87,8 @@ esp_err_t fpc1020_read_interrupt(fpc1020_interrupt_t *interrupt, uint8_t clear)
         ESP_LOGE(LOG_TAG, "Failed to retrieve interrupt status: %d", ret);
         return ret;
     }
+
+    ESP_LOGI(LOG_TAG, "Received interrupt flags 0x%X", t.rx_data[0]);
 
     interrupt->command_done = (t.rx_data[0] & (1 << 7)) != 0;
     interrupt->image_available = (t.rx_data[0] & (1 << 5)) != 0;
@@ -114,4 +111,23 @@ esp_err_t fpc1020_finger_present_query()
     }
 
     return ESP_OK;
+}
+
+esp_err_t fpc1020_get_finger_present_status(uint16_t *status)
+{
+    spi_transaction_t t = {
+        .cmd = 0xD4,
+        .length = 8 * 2,
+        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+
+    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(LOG_TAG, "Failed to retrieve hardware id: %d", ret);
+        return ret;
+    }
+
+    *status = t.rx_data[0] << 8 | t.rx_data[1];
+
+    return ret;
 }

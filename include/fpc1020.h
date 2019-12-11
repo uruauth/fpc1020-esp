@@ -12,6 +12,8 @@ esp_err_t fpc1020_init();
 
 esp_err_t fpc1020_get_hwid(uint16_t *hwid);
 
+esp_err_t fpc1020_get_finger_present_status(uint16_t *status);
+
 esp_err_t fpc1020_capture_image();
 
 esp_err_t fpc1020_read_image();
@@ -28,4 +30,4 @@ esp_err_t fpc1020_soft_reset();
 
 esp_err_t fpc1020_clkbist();
 
-esp_err_t fpc1020_irq_status(uint8_t* status);
+esp_err_t fpc1020_irq_status(uint8_t *status);
