@@ -123,11 +123,86 @@ esp_err_t fpc1020_get_finger_present_status(uint16_t *status)
     esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
     if (ret != ESP_OK)
     {
-        ESP_LOGE(LOG_TAG, "Failed to retrieve hardware id: %d", ret);
+        ESP_LOGE(LOG_TAG, "Failed to retrieve finger present status: %d", ret);
         return ret;
     }
 
     *status = t.rx_data[0] << 8 | t.rx_data[1];
+
+    return ret;
+}
+
+esp_err_t fpc1020_get_error(uint8_t *error)
+{
+    spi_transaction_t t = {
+        .cmd = 0x38,
+        .length = 8,
+        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+
+    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(LOG_TAG, "Failed to retrieve error: %d", ret);
+        return ret;
+    }
+
+    ESP_LOGI(LOG_TAG, "Error: %d", t.rx_data[0]);
+
+    *error = t.rx_data[0];
+
+    return ret;
+}
+
+esp_err_t fpc1020_get_finger_drive_conf(fpc1020_finger_drive_conf_t *conf)
+{
+    spi_transaction_t t = {
+        .cmd = 0x8C,
+        .length = 8,
+        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+
+    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(LOG_TAG, "Failed to retrieve finger drive conf: %d", ret);
+        return ret;
+    }
+
+    uint8_t retVal = t.rx_data[0];
+
+    ESP_LOGI(LOG_TAG, "Finger Drive Conf: %x", retVal);
+
+    conf->fngrDrvVdBstEn = (retVal & (1 << 5)) != 0;
+    conf->fngrDrvVdIntEn = (retVal & (1 << 4)) != 0;
+    conf->fngrDrvExtInv = (retVal & (1 << 3)) != 0;
+    conf->fngrDrvTst = (retVal & (1 << 2)) != 0;
+    conf->fngrDrvExt = (retVal & (1 << 1)) != 0;
+
+    return ret;
+}
+
+esp_err_t fpc1020_get_image_capture_size(uint8_t *startRow, uint8_t *rowLength, uint8_t *startCol, uint8_t *colLength)
+{
+    spi_transaction_t t = {
+        .cmd = 0x8C,
+        .length = 8 * 4,
+        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+
+    t.tx_data[3] = *startRow;
+    t.tx_data[2] = *rowLength;
+    t.tx_data[1] = *startCol;
+    t.tx_data[0] = *colLength;
+
+    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(LOG_TAG, "Failed to retrieve hardware id: %d", ret);
+        return ret;
+    }
+
+    *startRow = t.rx_data[3];
+    *rowLength = t.rx_data[2];
+    *startCol = t.rx_data[1];
+    *colLength = t.rx_data[0];
 
     return ret;
 }

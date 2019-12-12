@@ -23,6 +23,15 @@ typedef struct
     uint16_t sleep : 7;
 } fpc1020_detect_t;
 
+typedef struct
+{
+    uint8_t fngrDrvVdBstEn : 1;
+    uint8_t fngrDrvVdIntEn : 1;
+    uint8_t fngrDrvExtInv : 1;
+    uint8_t fngrDrvTst : 1;
+    uint8_t fngrDrvExt : 1;
+} fpc1020_finger_drive_conf_t;
+
 // init the defice
 esp_err_t fpc1020_init();
 
@@ -40,13 +49,13 @@ esp_err_t fpc1020_wait_for_finger();
 esp_err_t fpc1020_sleep(fpc1020_sleep_mode_t mode);
 
 // 38
-esp_err_t fpc1020_get_error(uint8_t* error);
+esp_err_t fpc1020_get_error(uint8_t *error);
 
 // 3C
 esp_err_t fpc1020_get_clkbist();
 
 // 54
-esp_err_t fpc1020_get_image_capture_size();
+esp_err_t fpc1020_get_image_capture_size(uint8_t *startRow, uint8_t *rowLength, uint8_t *startCol, uint8_t *colLength);
 
 // 78
 esp_err_t fpc1020_get_test_pattern();
@@ -55,7 +64,7 @@ esp_err_t fpc1020_get_test_pattern();
 esp_err_t fpc1020_get_clkbist_result();
 
 // 8C
-esp_err_t fpc1020_get_finger_drive_conf();
+esp_err_t fpc1020_get_finger_drive_conf(fpc1020_finger_drive_conf_t *conf);
 
 // 94
 esp_err_t fpc1020_get_ost_trim();
