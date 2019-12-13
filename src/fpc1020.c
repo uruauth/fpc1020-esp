@@ -76,7 +76,7 @@ esp_err_t fpc1020_init()
  * @param cmd
  * @return esp_err_t
  */
-static esp_err_t fpc1020_command(uint8_t cmd)
+static esp_err_t fpc1020_command(fpc1020_reg_t cmd)
 {
     spi_transaction_t t = {
         .cmd = cmd};
@@ -98,7 +98,7 @@ static esp_err_t fpc1020_command(uint8_t cmd)
  * @param val
  * @return esp_err_t
  */
-static esp_err_t fpc1020_transmit_uint8(uint8_t cmd, uint8_t *val)
+static esp_err_t fpc1020_transmit_uint8(fpc1020_reg_t cmd, uint8_t *val)
 {
     spi_transaction_t t = {
         .cmd = cmd,
@@ -123,7 +123,7 @@ static esp_err_t fpc1020_transmit_uint8(uint8_t cmd, uint8_t *val)
  * @param val
  * @return esp_err_t
  */
-static esp_err_t fpc1020_transmit_uint16(uint8_t cmd, uint16_t *val)
+static esp_err_t fpc1020_transmit_uint16(fpc1020_reg_t cmd, uint16_t *val)
 {
     spi_transaction_t t = {
         .cmd = cmd,
@@ -148,7 +148,7 @@ static esp_err_t fpc1020_transmit_uint16(uint8_t cmd, uint16_t *val)
  * @param val
  * @return esp_err_t
  */
-static esp_err_t fpc1020_transmit_uint32(uint8_t cmd, uint32_t *val)
+static esp_err_t fpc1020_transmit_uint32(fpc1020_reg_t cmd, uint32_t *val)
 {
     spi_transaction_t t = {
         .cmd = cmd,
@@ -166,14 +166,38 @@ static esp_err_t fpc1020_transmit_uint32(uint8_t cmd, uint32_t *val)
     return ret;
 }
 
+esp_err_t fpc1020_test()
+{
+    ESP_LOGI(LOG_TAG, "Testing FPC1020");
+
+    for (uint16_t reg = 0; reg <= 0xFF; reg++)
+    {
+        ESP_LOGI(LOG_TAG, "Reg: %d (0x%X)", reg, reg);
+
+        uint32_t val;
+        esp_err_t ret = fpc1020_transmit_uint32(reg, &val);
+
+        if (ret == ESP_OK)
+        {
+            ESP_LOGI(LOG_TAG, "SUCCESS, value 0x%X", val);
+        }
+        else
+        {
+            ESP_LOGI(LOG_TAG, "ERROR, code 0x%X", ret);
+        }
+    }
+
+    return ESP_OK;
+}
+
 /**
  * @brief Read interrupt with no clear / Read interrupt with clear
- * 
+ *
  * Read interrupt register. Two byte access, command and interrupt data.
- * 
- * @param interrupt 
- * @param clear 
- * @return esp_err_t 
+ *
+ * @param interrupt
+ * @param clear
+ * @return esp_err_t
  */
 esp_err_t fpc1020_read_interrupt(uint8_t *interrupt, uint8_t clear)
 {
@@ -184,10 +208,10 @@ esp_err_t fpc1020_read_interrupt(uint8_t *interrupt, uint8_t clear)
 
 /**
  * @brief Finger present query
- * 
+ *
  * Checks if a finger is present. One byte access, only the command is transmitted.
- * 
- * @return esp_err_t 
+ *
+ * @return esp_err_t
  */
 esp_err_t fpc1020_finger_present_query()
 {
@@ -198,10 +222,10 @@ esp_err_t fpc1020_finger_present_query()
 
 /**
  * @brief Wait for finger present
- * 
+ *
  * Continue to check for a finger until a finger is present. One byte access, only the command is transmitted.
- * 
- * @return esp_err_t 
+ *
+ * @return esp_err_t
  */
 esp_err_t fpc1020_wait_for_finger()
 {
@@ -212,11 +236,11 @@ esp_err_t fpc1020_wait_for_finger()
 
 /**
  * @brief Activate sleep mode
- * 
+ *
  * Go to Sleep Mode. One byte access, only the command is transmitted.
- * 
- * @param mode 
- * @return esp_err_t 
+ *
+ * @param mode
+ * @return esp_err_t
  */
 esp_err_t fpc1020_sleep(fpc1020_sleep_mode_t mode)
 {
@@ -241,11 +265,11 @@ esp_err_t fpc1020_sleep(fpc1020_sleep_mode_t mode)
 
 /**
  * @brief Errors
- * 
+ *
  * The name of the error register is fpcError. The fpcError register has access to two bytes: one address byte and one read byte.
- * 
- * @param error 
- * @return esp_err_t 
+ *
+ * @param error
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_error(uint8_t *error)
 {
@@ -256,14 +280,14 @@ esp_err_t fpc1020_get_error(uint8_t *error)
 
 /**
  * @brief ClkBIST
- * 
- * The command is used to measure the two internal oscillators’ frequency in relation to a known SPICLK frequency. 
+ *
+ * The command is used to measure the two internal oscillators’ frequency in relation to a known SPICLK frequency.
  * The command is done with one byte access plus a number of SPICLK cycles which is decided by the frequency of the OscLo oscillator.
  * The measurement needs to run between two rising edges of the OscLo oscillator. Sending more SPICLK pulses will not affect the measurement.
  * The result is read in the clkBistResult register.
  * For more information on calculating clock frequencies, see section 5.7.
- * 
- * @return esp_err_t 
+ *
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_clkbist()
 {
@@ -272,9 +296,9 @@ esp_err_t fpc1020_get_clkbist()
 
 /**
  * @brief Image Capture Size
- * 
- * @param size 
- * @return esp_err_t 
+ *
+ * @param size
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_image_capture_size(uint32_t *size)
 {
@@ -285,9 +309,9 @@ esp_err_t fpc1020_get_image_capture_size(uint32_t *size)
 
 /**
  * @brief Test Pattern
- * 
- * @param testPattern 
- * @return esp_err_t 
+ *
+ * @param testPattern
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_test_pattern(uint16_t *testPattern)
 {
@@ -298,8 +322,8 @@ esp_err_t fpc1020_get_test_pattern(uint16_t *testPattern)
 
 /**
  * @brief Oscillator Frequency Calculation
- * 
- * @return esp_err_t 
+ *
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_clkbist_result()
 {
@@ -308,21 +332,21 @@ esp_err_t fpc1020_get_clkbist_result()
 
 /**
  * @brief Finger Drive
- * 
- * @param conf 
- * @return esp_err_t 
+ *
+ * @param conf
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_finger_drive_conf(uint8_t *conf)
 {
-    CHECK_RET(fpc1020_transmit_uint8(0x8C, conf), "Failed to retrieve finger drive conf"));
+    CHECK_RET(fpc1020_transmit_uint8(0x8C, conf), "Failed to retrieve finger drive conf");
 
-    return ret;
+    return ESP_OK;
 }
 
 /**
  * @brief Oscillator Calibration
- * 
- * @return esp_err_t 
+ *
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_osc_trim()
 {
@@ -331,8 +355,8 @@ esp_err_t fpc1020_get_osc_trim()
 
 /**
  * @brief Shift Gain
- * 
- * @return esp_err_t 
+ *
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_adc_shift_gain()
 {
@@ -341,26 +365,26 @@ esp_err_t fpc1020_get_adc_shift_gain()
 
 /**
  * @brief Capture image
- * 
+ *
  * Capture new image. One byte access. Only the command is transmitted.
- * 
- * @return esp_err_t 
+ *
+ * @return esp_err_t
  */
 esp_err_t fpc1020_capture_image()
 {
-    CHECK_RET(fpc1020_command(0xC0)), "Failed to start capturing image");
+    CHECK_RET(fpc1020_command(0xC0), "Failed to start capturing image");
 
     return ESP_OK;
 }
 
 /**
  * @brief Read image data
- * 
- * Valid data is first received following a command with a dummy byte. The read continues until csN is de-asserted. 
- * It is possible to split the reading of an image into several requests. 
+ *
+ * Valid data is first received following a command with a dummy byte. The read continues until csN is de-asserted.
+ * It is possible to split the reading of an image into several requests.
  * In this case, new commands (all but the first) should be issued without the dummy byte.
- * 
- * @return esp_err_t 
+ *
+ * @return esp_err_t
  */
 esp_err_t fpc1020_read_image()
 {
@@ -369,13 +393,13 @@ esp_err_t fpc1020_read_image()
 
 /**
  * @brief Finger Present Status
- * 
- * The name of the register for finger present status is fngrPresentStatus. 
- * The fngrPresentStatus register has access to three bytes: one address byte, and two data bytes. 
+ *
+ * The name of the register for finger present status is fngrPresentStatus.
+ * The fngrPresentStatus register has access to three bytes: one address byte, and two data bytes.
  * Current register content is read when data is written to the register.
- * 
- * @param status 
- * @return esp_err_t 
+ *
+ * @param status
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_finger_present_status(uint16_t *status)
 {
@@ -386,13 +410,13 @@ esp_err_t fpc1020_get_finger_present_status(uint16_t *status)
 
 /**
  * @brief Finger Detection Threshold
- * 
- * The name of the finger detection threshold register is fngrDetThresh. 
- * The fngrDetThresh register has access to two bytes: one address byte and one read byte. 
+ *
+ * The name of the finger detection threshold register is fngrDetThresh.
+ * The fngrDetThresh register has access to two bytes: one address byte and one read byte.
  * Current register content is read when data is written to the register
- * 
- * @param threshold 
- * @return esp_err_t 
+ *
+ * @param threshold
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_finger_det_thrs(uint8_t *threshold)
 {
@@ -403,13 +427,13 @@ esp_err_t fpc1020_get_finger_det_thrs(uint8_t *threshold)
 
 /**
  * @brief Finger Detection Queries
- * 
- * The name of the finger detection query control register is fngrDetCntr. 
- * The fngrDetCntr register has access to three bytes: one address byte and two read bytes. 
- * Current register content is read when data is written to the register. 
- * 
- * @param query 
- * @return esp_err_t 
+ *
+ * The name of the finger detection query control register is fngrDetCntr.
+ * The fngrDetCntr register has access to three bytes: one address byte and two read bytes.
+ * Current register content is read when data is written to the register.
+ *
+ * @param query
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_finger_det_cntr(uint16_t *query)
 {
@@ -420,10 +444,10 @@ esp_err_t fpc1020_get_finger_det_cntr(uint16_t *query)
 
 /**
  * @brief Soft reset
- * 
+ *
  * Performs a software controlled reset of the chip. One byte access, only the command is transmitted.
- * 
- * @return esp_err_t 
+ *
+ * @return esp_err_t
  */
 esp_err_t fpc1020_soft_reset()
 {
@@ -434,9 +458,9 @@ esp_err_t fpc1020_soft_reset()
 
 /**
  * @brief Hardware ID
- * 
- * @param hwid 
- * @return esp_err_t 
+ *
+ * @param hwid
+ * @return esp_err_t
  */
 esp_err_t fpc1020_get_hwid(uint16_t *hwid)
 {
