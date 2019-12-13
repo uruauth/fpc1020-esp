@@ -55,10 +55,10 @@ esp_err_t fpc1020_get_error(uint8_t *error);
 esp_err_t fpc1020_get_clkbist();
 
 // 54
-esp_err_t fpc1020_get_image_capture_size(uint8_t *startRow, uint8_t *rowLength, uint8_t *startCol, uint8_t *colLength);
+esp_err_t fpc1020_get_image_capture_size(uint32_t* size);
 
 // 78
-esp_err_t fpc1020_get_test_pattern();
+esp_err_t fpc1020_get_test_pattern(uint16_t* testPattern);
 
 // 7C
 esp_err_t fpc1020_get_clkbist_result();

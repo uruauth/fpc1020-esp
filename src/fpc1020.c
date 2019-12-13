@@ -16,8 +16,23 @@
 
 #define PIN_NUM_IRQ 4
 
+#define CHECK_RET(f, message)           \
+    {                                   \
+        esp_err_t ret = (f);            \
+        if (ret != ESP_OK)              \
+        {                               \
+            ESP_LOGE(LOG_TAG, message); \
+            return ret;                 \
+        }                               \
+    }
+
 static spi_device_handle_t fpc1020_spi;
 
+/**
+ * @brief Init FPC1020 device SPI
+ *
+ * @return esp_err_t
+ */
 esp_err_t fpc1020_init()
 {
     spi_bus_config_t buscfg = {
@@ -55,154 +70,202 @@ esp_err_t fpc1020_init()
     return ret;
 }
 
-esp_err_t fpc1020_get_hwid(uint16_t *hwid)
+/**
+ * @brief Send command to FPC1020 device
+ *
+ * @param cmd
+ * @return esp_err_t
+ */
+static esp_err_t fpc1020_command(uint8_t cmd)
 {
     spi_transaction_t t = {
-        .cmd = 0xFC,
-        .length = 8 * 2,
-        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+        .cmd = cmd};
 
     esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
     if (ret != ESP_OK)
     {
-        ESP_LOGE(LOG_TAG, "Failed to retrieve hardware id: %d", ret);
+        ESP_LOGE(LOG_TAG, "Failed to write command: %d", ret);
         return ret;
     }
-
-    *hwid = t.rx_data[0] << 8 | t.rx_data[1];
 
     return ret;
 }
 
-esp_err_t fpc1020_read_interrupt(fpc1020_interrupt_t *interrupt, uint8_t clear)
+/**
+ * @brief Transfer one byte to FPC1020 device
+ *
+ * @param cmd
+ * @param val
+ * @return esp_err_t
+ */
+static esp_err_t fpc1020_transmit_uint8(uint8_t cmd, uint8_t *val)
 {
     spi_transaction_t t = {
-        .cmd = clear ? 0x1C : 0x18,
+        .cmd = cmd,
         .length = 8,
-        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+        .tx_buffer = val,
+        .rx_buffer = val};
 
     esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(LOG_TAG, "Failed to transmit data: %d", ret);
+        return ret;
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Transfer 2 bytes to FPC1020 device
+ *
+ * @param cmd
+ * @param val
+ * @return esp_err_t
+ */
+static esp_err_t fpc1020_transmit_uint16(uint8_t cmd, uint16_t *val)
+{
+    spi_transaction_t t = {
+        .cmd = cmd,
+        .length = 8 * 2,
+        .tx_buffer = val,
+        .rx_buffer = val};
+
+    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(LOG_TAG, "Failed to transmit data: %d", ret);
+        return ret;
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Transfer 4 bytes to FPC1020 device
+ *
+ * @param cmd
+ * @param val
+ * @return esp_err_t
+ */
+static esp_err_t fpc1020_transmit_uint32(uint8_t cmd, uint32_t *val)
+{
+    spi_transaction_t t = {
+        .cmd = cmd,
+        .length = 8 * 4,
+        .tx_buffer = val,
+        .rx_buffer = val};
+
+    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(LOG_TAG, "Failed to transmit data: %d", ret);
+        return ret;
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Get Hardware ID
+ *
+ * @param hwid
+ * @return esp_err_t
+ */
+esp_err_t fpc1020_get_hwid(uint16_t *hwid)
+{
+    CHECK_RET(fpc1020_transmit_uint16(0xFC, hwid), "Failed to retrieve hardware id");
+
+    return ESP_OK;
+}
+
+esp_err_t fpc1020_read_interrupt(fpc1020_interrupt_t *interrupt, uint8_t clear)
+{
+    uint8_t idata = 0;
+
+    esp_err_t ret = fpc1020_transmit_uint8(clear ? 0x1C : 0x18, &idata);
     if (ret != ESP_OK)
     {
         ESP_LOGE(LOG_TAG, "Failed to retrieve interrupt status: %d", ret);
         return ret;
     }
 
-    ESP_LOGI(LOG_TAG, "Received interrupt flags 0x%X", t.rx_data[0]);
+    ESP_LOGI(LOG_TAG, "Received interrupt flags 0x%X, %s", idata, clear ? "cleared" : "not cleared");
 
-    interrupt->command_done = (t.rx_data[0] & (1 << 7)) != 0;
-    interrupt->image_available = (t.rx_data[0] & (1 << 5)) != 0;
-    interrupt->error = (t.rx_data[0] & (1 << 2)) != 0;
-    interrupt->finger_down = (t.rx_data[0] & (1 << 0)) != 0;
+    interrupt->command_done = (idata & (1 << 7)) != 0;
+    interrupt->image_available = (idata & (1 << 5)) != 0;
+    interrupt->error = (idata & (1 << 2)) != 0;
+    interrupt->finger_down = (idata & (1 << 0)) != 0;
 
     return ret;
 }
 
 esp_err_t fpc1020_finger_present_query()
 {
-    spi_transaction_t t = {
-        .cmd = 0x20};
+    ESP_LOGI(LOG_TAG, "Finger present query");
 
-    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(LOG_TAG, "Failed to query finger present: %d", ret);
-        return ret;
-    }
+    CHECK_RET(fpc1020_command(0x20), "Failed to query finger present");
 
     return ESP_OK;
 }
 
 esp_err_t fpc1020_get_finger_present_status(uint16_t *status)
 {
-    spi_transaction_t t = {
-        .cmd = 0xD4,
-        .length = 8 * 2,
-        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+    CHECK_RET(fpc1020_transmit_uint16(0xD4, status), "");
 
-    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(LOG_TAG, "Failed to retrieve finger present status: %d", ret);
-        return ret;
-    }
-
-    *status = t.rx_data[0] << 8 | t.rx_data[1];
-
-    return ret;
+    return ESP_OK;
 }
 
 esp_err_t fpc1020_get_error(uint8_t *error)
 {
-    spi_transaction_t t = {
-        .cmd = 0x38,
-        .length = 8,
-        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+    CHECK_RET(fpc1020_transmit_uint8(0x38, error), "Failed to retrieve error");
 
-    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
-    if (ret != ESP_OK)
+    if (*error != 0)
     {
-        ESP_LOGE(LOG_TAG, "Failed to retrieve error: %d", ret);
-        return ret;
+        ESP_LOGW(LOG_TAG, "Error: %d", *error);
     }
 
-    ESP_LOGI(LOG_TAG, "Error: %d", t.rx_data[0]);
-
-    *error = t.rx_data[0];
-
-    return ret;
+    return ESP_OK;
 }
 
 esp_err_t fpc1020_get_finger_drive_conf(fpc1020_finger_drive_conf_t *conf)
 {
-    spi_transaction_t t = {
-        .cmd = 0x8C,
-        .length = 8,
-        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+    uint8_t dt = 0;
 
-    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    dt |= conf->fngrDrvVdBstEn ? (1 << 5) : 0;
+    dt |= conf->fngrDrvVdIntEn ? (1 << 4) : 0;
+    dt |= conf->fngrDrvExtInv ? (1 << 3) : 0;
+    dt |= conf->fngrDrvTst ? (1 << 2) : 0;
+    dt |= conf->fngrDrvExt ? (1 << 1) : 0;
+
+    esp_err_t ret = fpc1020_transmit_uint8(0x8C, &dt);
     if (ret != ESP_OK)
     {
         ESP_LOGE(LOG_TAG, "Failed to retrieve finger drive conf: %d", ret);
         return ret;
     }
 
-    uint8_t retVal = t.rx_data[0];
+    ESP_LOGI(LOG_TAG, "Finger Drive Conf: 0x%x", dt);
 
-    ESP_LOGI(LOG_TAG, "Finger Drive Conf: %x", retVal);
-
-    conf->fngrDrvVdBstEn = (retVal & (1 << 5)) != 0;
-    conf->fngrDrvVdIntEn = (retVal & (1 << 4)) != 0;
-    conf->fngrDrvExtInv = (retVal & (1 << 3)) != 0;
-    conf->fngrDrvTst = (retVal & (1 << 2)) != 0;
-    conf->fngrDrvExt = (retVal & (1 << 1)) != 0;
+    conf->fngrDrvVdBstEn = (dt & (1 << 5)) != 0;
+    conf->fngrDrvVdIntEn = (dt & (1 << 4)) != 0;
+    conf->fngrDrvExtInv = (dt & (1 << 3)) != 0;
+    conf->fngrDrvTst = (dt & (1 << 2)) != 0;
+    conf->fngrDrvExt = (dt & (1 << 1)) != 0;
 
     return ret;
 }
 
-esp_err_t fpc1020_get_image_capture_size(uint8_t *startRow, uint8_t *rowLength, uint8_t *startCol, uint8_t *colLength)
+esp_err_t fpc1020_get_image_capture_size(uint32_t *size)
 {
-    spi_transaction_t t = {
-        .cmd = 0x8C,
-        .length = 8 * 4,
-        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA};
+    CHECK_RET(fpc1020_transmit_uint32(0x8C, size), "Failed to retrieve capture size");
 
-    t.tx_data[3] = *startRow;
-    t.tx_data[2] = *rowLength;
-    t.tx_data[1] = *startCol;
-    t.tx_data[0] = *colLength;
+    return ESP_OK;
+}
 
-    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(LOG_TAG, "Failed to retrieve hardware id: %d", ret);
-        return ret;
-    }
+esp_err_t fpc1020_get_test_pattern(uint16_t *testPattern)
+{
+    CHECK_RET(fpc1020_transmit_uint16(0x78, testPattern), "Failed to retrieve test pattern");
 
-    *startRow = t.rx_data[3];
-    *rowLength = t.rx_data[2];
-    *startCol = t.rx_data[1];
-    *colLength = t.rx_data[0];
-
-    return ret;
+    return ESP_OK;
 }
