@@ -167,95 +167,115 @@ static esp_err_t fpc1020_transmit_uint32(uint8_t cmd, uint32_t *val)
 }
 
 /**
- * @brief Get Hardware ID
- *
- * @param hwid
- * @return esp_err_t
+ * @brief Read interrupt with no clear / Read interrupt with clear
+ * 
+ * Read interrupt register. Two byte access, command and interrupt data.
+ * 
+ * @param interrupt 
+ * @param clear 
+ * @return esp_err_t 
  */
-esp_err_t fpc1020_get_hwid(uint16_t *hwid)
+esp_err_t fpc1020_read_interrupt(uint8_t *interrupt, uint8_t clear)
 {
-    CHECK_RET(fpc1020_transmit_uint16(0xFC, hwid), "Failed to retrieve hardware id");
+    CHECK_RET(fpc1020_transmit_uint8(clear ? 0x1C : 0x18, interrupt), "Failed to retrieve interrupt status");
 
     return ESP_OK;
 }
 
-esp_err_t fpc1020_read_interrupt(fpc1020_interrupt_t *interrupt, uint8_t clear)
-{
-    uint8_t idata = 0;
-
-    esp_err_t ret = fpc1020_transmit_uint8(clear ? 0x1C : 0x18, &idata);
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(LOG_TAG, "Failed to retrieve interrupt status: %d", ret);
-        return ret;
-    }
-
-    ESP_LOGI(LOG_TAG, "Received interrupt flags 0x%X, %s", idata, clear ? "cleared" : "not cleared");
-
-    interrupt->command_done = (idata & (1 << 7)) != 0;
-    interrupt->image_available = (idata & (1 << 5)) != 0;
-    interrupt->error = (idata & (1 << 2)) != 0;
-    interrupt->finger_down = (idata & (1 << 0)) != 0;
-
-    return ret;
-}
-
+/**
+ * @brief Finger present query
+ * 
+ * Checks if a finger is present. One byte access, only the command is transmitted.
+ * 
+ * @return esp_err_t 
+ */
 esp_err_t fpc1020_finger_present_query()
 {
-    ESP_LOGI(LOG_TAG, "Finger present query");
-
     CHECK_RET(fpc1020_command(0x20), "Failed to query finger present");
 
     return ESP_OK;
 }
 
-esp_err_t fpc1020_get_finger_present_status(uint16_t *status)
+/**
+ * @brief Wait for finger present
+ * 
+ * Continue to check for a finger until a finger is present. One byte access, only the command is transmitted.
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_wait_for_finger()
 {
-    CHECK_RET(fpc1020_transmit_uint16(0xD4, status), "");
+    CHECK_RET(fpc1020_command(0x24), "Failed to wait for finger");
 
     return ESP_OK;
 }
 
+/**
+ * @brief Activate sleep mode
+ * 
+ * Go to Sleep Mode. One byte access, only the command is transmitted.
+ * 
+ * @param mode 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_sleep(fpc1020_sleep_mode_t mode)
+{
+    switch (mode)
+    {
+    case SLEEP:
+        CHECK_RET(fpc1020_command(0x28), "Failed to enter sleep mode");
+        break;
+    case DEEP_SLEEP:
+        CHECK_RET(fpc1020_command(0x2C), "Failed to enter deep sleep mode");
+        break;
+    case IDLE:
+        CHECK_RET(fpc1020_command(0x34), "Failed to enter idle mode");
+        break;
+    default:
+        ESP_LOGE(LOG_TAG, "Invalid sleep mode %d", mode);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    return ESP_OK;
+}
+
+/**
+ * @brief Errors
+ * 
+ * The name of the error register is fpcError. The fpcError register has access to two bytes: one address byte and one read byte.
+ * 
+ * @param error 
+ * @return esp_err_t 
+ */
 esp_err_t fpc1020_get_error(uint8_t *error)
 {
     CHECK_RET(fpc1020_transmit_uint8(0x38, error), "Failed to retrieve error");
 
-    if (*error != 0)
-    {
-        ESP_LOGW(LOG_TAG, "Error: %d", *error);
-    }
-
     return ESP_OK;
 }
 
-esp_err_t fpc1020_get_finger_drive_conf(fpc1020_finger_drive_conf_t *conf)
+/**
+ * @brief ClkBIST
+ * 
+ * The command is used to measure the two internal oscillators’ frequency in relation to a known SPICLK frequency. 
+ * The command is done with one byte access plus a number of SPICLK cycles which is decided by the frequency of the OscLo oscillator.
+ * The measurement needs to run between two rising edges of the OscLo oscillator. Sending more SPICLK pulses will not affect the measurement.
+ * The result is read in the clkBistResult register.
+ * For more information on calculating clock frequencies, see section 5.7.
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_get_clkbist()
 {
-    uint8_t dt = 0;
-
-    dt |= conf->fngrDrvVdBstEn ? (1 << 5) : 0;
-    dt |= conf->fngrDrvVdIntEn ? (1 << 4) : 0;
-    dt |= conf->fngrDrvExtInv ? (1 << 3) : 0;
-    dt |= conf->fngrDrvTst ? (1 << 2) : 0;
-    dt |= conf->fngrDrvExt ? (1 << 1) : 0;
-
-    esp_err_t ret = fpc1020_transmit_uint8(0x8C, &dt);
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(LOG_TAG, "Failed to retrieve finger drive conf: %d", ret);
-        return ret;
-    }
-
-    ESP_LOGI(LOG_TAG, "Finger Drive Conf: 0x%x", dt);
-
-    conf->fngrDrvVdBstEn = (dt & (1 << 5)) != 0;
-    conf->fngrDrvVdIntEn = (dt & (1 << 4)) != 0;
-    conf->fngrDrvExtInv = (dt & (1 << 3)) != 0;
-    conf->fngrDrvTst = (dt & (1 << 2)) != 0;
-    conf->fngrDrvExt = (dt & (1 << 1)) != 0;
-
-    return ret;
+    return ESP_OK;
 }
 
+/**
+ * @brief Image Capture Size
+ * 
+ * @param size 
+ * @return esp_err_t 
+ */
 esp_err_t fpc1020_get_image_capture_size(uint32_t *size)
 {
     CHECK_RET(fpc1020_transmit_uint32(0x8C, size), "Failed to retrieve capture size");
@@ -263,9 +283,164 @@ esp_err_t fpc1020_get_image_capture_size(uint32_t *size)
     return ESP_OK;
 }
 
+/**
+ * @brief Test Pattern
+ * 
+ * @param testPattern 
+ * @return esp_err_t 
+ */
 esp_err_t fpc1020_get_test_pattern(uint16_t *testPattern)
 {
     CHECK_RET(fpc1020_transmit_uint16(0x78, testPattern), "Failed to retrieve test pattern");
+
+    return ESP_OK;
+}
+
+/**
+ * @brief Oscillator Frequency Calculation
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_get_clkbist_result()
+{
+    return ESP_OK;
+}
+
+/**
+ * @brief Finger Drive
+ * 
+ * @param conf 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_get_finger_drive_conf(uint8_t *conf)
+{
+    CHECK_RET(fpc1020_transmit_uint8(0x8C, conf), "Failed to retrieve finger drive conf"));
+
+    return ret;
+}
+
+/**
+ * @brief Oscillator Calibration
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_get_osc_trim()
+{
+    return ESP_OK;
+}
+
+/**
+ * @brief Shift Gain
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_get_adc_shift_gain()
+{
+    return ESP_OK;
+}
+
+/**
+ * @brief Capture image
+ * 
+ * Capture new image. One byte access. Only the command is transmitted.
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_capture_image()
+{
+    CHECK_RET(fpc1020_command(0xC0)), "Failed to start capturing image");
+
+    return ESP_OK;
+}
+
+/**
+ * @brief Read image data
+ * 
+ * Valid data is first received following a command with a dummy byte. The read continues until csN is de-asserted. 
+ * It is possible to split the reading of an image into several requests. 
+ * In this case, new commands (all but the first) should be issued without the dummy byte.
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_read_image()
+{
+    return ESP_OK;
+}
+
+/**
+ * @brief Finger Present Status
+ * 
+ * The name of the register for finger present status is fngrPresentStatus. 
+ * The fngrPresentStatus register has access to three bytes: one address byte, and two data bytes. 
+ * Current register content is read when data is written to the register.
+ * 
+ * @param status 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_get_finger_present_status(uint16_t *status)
+{
+    CHECK_RET(fpc1020_transmit_uint16(0xD4, status), "Failed to get finger present status");
+
+    return ESP_OK;
+}
+
+/**
+ * @brief Finger Detection Threshold
+ * 
+ * The name of the finger detection threshold register is fngrDetThresh. 
+ * The fngrDetThresh register has access to two bytes: one address byte and one read byte. 
+ * Current register content is read when data is written to the register
+ * 
+ * @param threshold 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_get_finger_det_thrs(uint8_t *threshold)
+{
+    CHECK_RET(fpc1020_transmit_uint8(0xD8, threshold), "Failed to read detection threshold")
+
+    return ESP_OK;
+}
+
+/**
+ * @brief Finger Detection Queries
+ * 
+ * The name of the finger detection query control register is fngrDetCntr. 
+ * The fngrDetCntr register has access to three bytes: one address byte and two read bytes. 
+ * Current register content is read when data is written to the register. 
+ * 
+ * @param query 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_get_finger_det_cntr(uint16_t *query)
+{
+    CHECK_RET(fpc1020_transmit_uint16(0xDC, query), "Failed to retrieve finger detection queries");
+
+    return ESP_OK;
+}
+
+/**
+ * @brief Soft reset
+ * 
+ * Performs a software controlled reset of the chip. One byte access, only the command is transmitted.
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_soft_reset()
+{
+    CHECK_RET(fpc1020_command(0xF8), "Failed to soft reset");
+
+    return ESP_OK;
+}
+
+/**
+ * @brief Hardware ID
+ * 
+ * @param hwid 
+ * @return esp_err_t 
+ */
+esp_err_t fpc1020_get_hwid(uint16_t *hwid)
+{
+    CHECK_RET(fpc1020_transmit_uint16(0xFC, hwid), "Failed to retrieve hardware id");
 
     return ESP_OK;
 }
