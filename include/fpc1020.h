@@ -49,7 +49,7 @@ typedef enum
 // init the defice
 esp_err_t fpc1020_init();
 
-esp_err_t fpc1020_test();
+esp_err_t fpc1020_setup();
 
 esp_err_t fpc1020_read_interrupt(uint8_t *interrupt, uint8_t clear);
 
@@ -77,7 +77,7 @@ esp_err_t fpc1020_get_adc_shift_gain();
 
 esp_err_t fpc1020_capture_image();
 
-esp_err_t fpc1020_read_image();
+esp_err_t fpc1020_read_image(uint8_t *buf, size_t bufSize);
 
 esp_err_t fpc1020_get_finger_present_status(uint16_t *status);
 

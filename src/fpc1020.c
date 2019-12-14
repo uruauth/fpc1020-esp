@@ -166,27 +166,70 @@ static esp_err_t fpc1020_transmit_uint32(fpc1020_reg_t cmd, uint32_t *val)
     return ret;
 }
 
-esp_err_t fpc1020_test()
+/**
+ * @brief
+ *
+ * @param cmd
+ * @param val
+ * @return esp_err_t
+ */
+static esp_err_t fpc1020_transmit_uint64(fpc1020_reg_t cmd, uint64_t *val)
 {
-    ESP_LOGI(LOG_TAG, "Testing FPC1020");
+    spi_transaction_t t = {
+        .cmd = cmd,
+        .length = 8 * 8,
+        .tx_buffer = val,
+        .rx_buffer = val};
 
-    for (uint16_t reg = 0; reg <= 0xFF; reg++)
+    esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+    if (ret != ESP_OK)
     {
-        ESP_LOGI(LOG_TAG, "Reg: %d (0x%X)", reg, reg);
-
-        uint32_t val;
-        esp_err_t ret = fpc1020_transmit_uint32(reg, &val);
-
-        if (ret == ESP_OK)
-        {
-            ESP_LOGI(LOG_TAG, "SUCCESS, value 0x%X", val);
-        }
-        else
-        {
-            ESP_LOGI(LOG_TAG, "ERROR, code 0x%X", ret);
-        }
+        ESP_LOGE(LOG_TAG, "Failed to transmit data: %d", ret);
+        return ret;
     }
 
+    return ret;
+}
+
+/**
+ * @brief Setup FPC1020 device
+ *
+ * @return esp_err_t
+ */
+esp_err_t fpc1020_setup()
+{
+    uint8_t val8;
+    uint16_t val16;
+    uint32_t val32;
+    uint64_t val64;
+
+    // revision 3
+    val64 = 0x1717171723232323;
+    CHECK_RET(fpc1020_transmit_uint64(FPC102X_REG_SAMPLE_PX_DLY, &val64), "");
+
+    val8 = 0x0f;
+    CHECK_RET(fpc1020_transmit_uint8(FPC102X_REG_PXL_RST_DLY, &val8), "");
+
+    val8 = 0x18;
+    CHECK_RET(fpc1020_transmit_uint8(FPC102X_REG_FINGER_DRIVE_DLY, &val8), "");
+
+    val8 = 0x02;
+    CHECK_RET(fpc1020_transmit_uint8(FPC102X_REG_FINGER_DRIVE_CONF, &val8), "");
+
+    val16 = 0x1002;
+    CHECK_RET(fpc1020_transmit_uint16(FPC102X_REG_ADC_SHIFT_GAIN, &val16), "");
+
+    val16 = 0x000a | 0x0F00;
+    CHECK_RET(fpc1020_transmit_uint16(FPC102X_REG_PXL_CTRL, &val16), "");
+
+    val8 = 0x03 | 0x08;
+    CHECK_RET(fpc1020_transmit_uint8(FPC102X_REG_IMAGE_SETUP, &val8), "");
+
+    val8 = 0x50;
+    CHECK_RET(fpc1020_transmit_uint8(FPC1020_REG_FNGR_DET_THRES, &val8), "");
+
+    val16 = 0x00FF;
+    CHECK_RET(fpc1020_transmit_uint16(FPC1020_REG_FNGR_DET_CNTR, &val16), "");
     return ESP_OK;
 }
 
@@ -386,7 +429,7 @@ esp_err_t fpc1020_capture_image()
  *
  * @return esp_err_t
  */
-esp_err_t fpc1020_read_image()
+esp_err_t fpc1020_read_image(uint8_t* buf, size_t bufSize)
 {
     return ESP_OK;
 }
