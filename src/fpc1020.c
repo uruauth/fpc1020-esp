@@ -1,5 +1,8 @@
 #include <string.h>
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include <esp_err.h>
 #include <esp_log.h>
 
@@ -41,7 +44,7 @@ esp_err_t fpc1020_init()
         .sclk_io_num = PIN_NUM_CLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = 192 * 192};
+        .max_transfer_sz = 192 * 192 + 1};
 
     spi_device_interface_config_t devcfg = {
         .command_bits = 8,
@@ -53,7 +56,7 @@ esp_err_t fpc1020_init()
     };
 
     //Initialize the SPI bus
-    esp_err_t ret = spi_bus_initialize(HSPI_HOST, &buscfg, 0);
+    esp_err_t ret = spi_bus_initialize(HSPI_HOST, &buscfg, 2);
     if (ret != ESP_OK)
     {
         ESP_LOGE(LOG_TAG, "Failed to init SPI bus: %d", ret);
@@ -406,6 +409,9 @@ esp_err_t fpc1020_get_adc_shift_gain()
     return ESP_OK;
 }
 
+static uint8_t image[192 * 192 + 1];
+const size_t imageBufSize = 192 * 192 + 1;
+
 /**
  * @brief Capture image
  *
@@ -415,7 +421,43 @@ esp_err_t fpc1020_get_adc_shift_gain()
  */
 esp_err_t fpc1020_capture_image()
 {
+    // setup?
+
+    //
     CHECK_RET(fpc1020_command(0xC0), "Failed to start capturing image");
+
+    ESP_LOGI(LOG_TAG, "Waiting for the interrupt...");
+    // wait for the interrupt
+    for (int i = 0; i < 20; i++)
+    {
+        uint8_t intr = 0;
+        ESP_ERROR_CHECK(fpc1020_read_interrupt(&intr, 1));
+
+        if (intr == (1 << 5))
+        {
+            ESP_LOGI(LOG_TAG, "Image available");
+
+            memset(image, 0, imageBufSize);
+
+            spi_transaction_t t = {
+                .cmd = 0xC4,
+                .length = imageBufSize * 8,
+                .tx_buffer = image,
+                .rx_buffer = image};
+
+            esp_err_t ret = spi_device_polling_transmit(fpc1020_spi, &t);
+
+            ESP_LOGI(LOG_TAG, "Image received");
+
+            for(int i = 0; i < 10; i++) {
+                ESP_LOG_BUFFER_HEX(LOG_TAG, image, 192 * i + 1);
+            }
+
+            break;
+        }
+
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+    }
 
     return ESP_OK;
 }
@@ -429,7 +471,7 @@ esp_err_t fpc1020_capture_image()
  *
  * @return esp_err_t
  */
-esp_err_t fpc1020_read_image(uint8_t* buf, size_t bufSize)
+esp_err_t fpc1020_read_image(uint8_t *buf, size_t bufSize)
 {
     return ESP_OK;
 }
