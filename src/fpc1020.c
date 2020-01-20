@@ -70,6 +70,8 @@ esp_err_t fpc1020_init()
         return ret;
     }
 
+    ESP_LOGI(LOG_TAG, "FPC1020A SPI Init done");
+
     return ret;
 }
 
