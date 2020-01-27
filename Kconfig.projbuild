@@ -1,0 +1,43 @@
+menu "FPC1020A"
+
+    menu "SPI"
+
+        config FPC1020A_PIN_MISO
+            int "SPI MISO Pin"
+            default 12
+            help
+                GPIO number for SPI MISO line
+
+        config FPC1020A_PIN_MOSI
+            int "SPI MOSI Pin"
+            default 13
+            help
+                GPIO number for SPI MOSI line
+
+        config FPC1020A_PIN_CLK
+            int "SPI CLK Pin"
+            default 14
+            help
+                GPIO number for SPI CLK line
+
+        config FPC1020A_PIN_CS
+            int "SPI CS Pin"
+            default 15
+            help
+                GPIO number for SPI CS line
+
+    endmenu
+
+    config FPC1020A_PIN_EN
+        int "FPC1020A Enable pin"
+        default 18
+        help
+            GPIO number for FPC1020A enable line
+
+    config FPC1020A_PIN_IRQ
+        int "IRQ Pin"
+        default 4
+        help
+            GPIO number for FPC1020A IRQ line
+
+endmenu

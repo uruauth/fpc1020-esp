@@ -10,6 +10,8 @@
 
 #include "fpc1020.h"
 
+#include "sdkconfig.h"
+
 #define LOG_TAG "FPC1020"
 
 #define PIN_NUM_MISO 12
@@ -39,9 +41,9 @@ static spi_device_handle_t fpc1020_spi;
 esp_err_t fpc1020_init()
 {
     spi_bus_config_t buscfg = {
-        .miso_io_num = PIN_NUM_MISO,
-        .mosi_io_num = PIN_NUM_MOSI,
-        .sclk_io_num = PIN_NUM_CLK,
+        .miso_io_num = CONFIG_FPC1020A_PIN_MISO,
+        .mosi_io_num = CONFIG_FPC1020A_PIN_MISO,
+        .sclk_io_num = CONFIG_FPC1020A_PIN_CLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
         .max_transfer_sz = 192 * 192 + 1};
@@ -50,7 +52,7 @@ esp_err_t fpc1020_init()
         .command_bits = 8,
         .clock_speed_hz = SPI_MASTER_FREQ_8M,
         .mode = 0,                  //SPI mode 0
-        .spics_io_num = PIN_NUM_CS, //CS pin
+        .spics_io_num = CONFIG_FPC1020A_PIN_CS, //CS pin
         .queue_size = 1,            //We want to be able to queue 7 transactions at a time
         // .pre_cb = lcd_spi_pre_transfer_callback, //Specify pre-transfer callback to handle D/C line
     };
